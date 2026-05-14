@@ -1,14 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 export default function AuthPage() {
-  const [mode, setMode] = useState("login"); // "login" or "register"
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
+  const [mode, setMode] = useState(initialMode); // "login" or "register"
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
+
+
+
+  useEffect(() => {
+    const nextMode = searchParams.get("mode") === "register" ? "register" : "login";
+    setMode(nextMode);
+    setError("");
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

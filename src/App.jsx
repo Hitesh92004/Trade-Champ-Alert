@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./lib/auth";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
+import LandingPage from "./pages/LandingPage";
 import AlertsPage from "./pages/AlertsPage";
 import DashboardPage from "./pages/DashboardPage";
 import AuthPage from "./pages/AuthPage";
@@ -45,7 +46,7 @@ function AppRoutes() {
 
   return (
     <>
-      {isAuthenticated && <Navbar />}
+      <Navbar />
       <Routes>
         <Route
           path="/auth"
@@ -53,6 +54,10 @@ function AppRoutes() {
         />
         <Route
           path="/"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+        />
+        <Route
+          path="/home"
           element={
             <ProtectedRoute>
               <HomePage />
