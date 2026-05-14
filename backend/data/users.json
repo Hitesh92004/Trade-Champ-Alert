@@ -1,0 +1,9 @@
+[
+  {
+    "id": "6f4b7ddf-e643-4334-9dd3-e500c5ac1300",
+    "name": "Test User",
+    "email": "testuser123test@example.com",
+    "password_hash": "$2b$12$AiMJlFfjh3C9OVlKp2HVbuAd0NJtpUunv2YK5MXxbE37tpRQrstx6",
+    "created_at": "2026-05-14T07:25:02.727502+00:00"
+  }
+]
