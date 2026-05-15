@@ -219,11 +219,6 @@ def fetch_current_price(symbol: str) -> Optional[float]:
             return float(price)
     except Exception:
         pass
-        data = fetch_history(symbol, period="5d", interval="1d")
-        if data:
-            return data[-1]["close"]
-    except Exception:
-        pass
 
     return None
 

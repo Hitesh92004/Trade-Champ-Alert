@@ -1,0 +1,35 @@
+[
+  {
+    "id": "47d7cf3f-bfcb-4409-9c46-8694465c175c",
+    "user_id": "6f4b7ddf-e643-4334-9dd3-e500c5ac1300",
+    "symbol": "BTC-USD",
+    "condition": "below",
+    "target_price": 78852.53,
+    "triggered": false,
+    "trigger_price": null,
+    "triggered_at": null,
+    "created_at": "2026-05-15T14:40:43.532469+00:00"
+  },
+  {
+    "id": "89f32ff5-e87d-4912-9153-fdb05c525cb0",
+    "user_id": "6f4b7ddf-e643-4334-9dd3-e500c5ac1300",
+    "symbol": "BTC-USD",
+    "condition": "above",
+    "target_price": 79093.01,
+    "triggered": true,
+    "trigger_price": 79123.52,
+    "triggered_at": "2026-05-15T14:41:40.360408+00:00",
+    "created_at": "2026-05-15T14:40:44.941433+00:00"
+  },
+  {
+    "id": "e77eae91-3bdd-463e-ac7a-17431bdea79a",
+    "user_id": "6f4b7ddf-e643-4334-9dd3-e500c5ac1300",
+    "symbol": "AAPL",
+    "condition": "below",
+    "target_price": 235.76,
+    "triggered": false,
+    "trigger_price": null,
+    "triggered_at": null,
+    "created_at": "2026-05-15T14:41:47.473063+00:00"
+  }
+]
