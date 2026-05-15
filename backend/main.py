@@ -262,9 +262,15 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     payload = decode_token(token)
     user_id = payload["sub"]
 
-    # Look up user in storage
-    users = _load_json(USERS_FILE)
-    user = next((u for u in users if u["id"] == user_id), None)
+    user = None
+    if _use_supabase:
+        res = _supabase.table("users").select("*").eq("id", user_id).execute()
+        if res.data:
+            user = res.data[0]
+    else:
+        users = _load_json(USERS_FILE)
+        user = next((u for u in users if u["id"] == user_id), None)
+        
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
@@ -302,8 +308,13 @@ class PushSubscription(BaseModel):
 def check_alerts():
     """Runs every 60 seconds — checks active alerts against live prices."""
     try:
-        alerts = _load_json(ALERTS_FILE)
-        active_alerts = [a for a in alerts if not a.get("triggered", False)]
+        if _use_supabase:
+            res = _supabase.table("alerts").select("*").eq("triggered", False).execute()
+            active_alerts = res.data
+        else:
+            alerts = _load_json(ALERTS_FILE)
+            active_alerts = [a for a in alerts if not a.get("triggered", False)]
+            
         if not active_alerts:
             return
 
@@ -316,9 +327,8 @@ def check_alerts():
                 prices[sym] = price
 
         changed = False
-        for alert in alerts:
-            if alert.get("triggered", False):
-                continue
+        updates = []
+        for alert in active_alerts:
             sym = alert["symbol"]
             if sym not in prices:
                 continue
@@ -335,13 +345,27 @@ def check_alerts():
                 alert["triggered_at"] = datetime.now(timezone.utc).isoformat()
                 alert["trigger_price"] = current_price
                 changed = True
+                updates.append(alert)
                 logger.info(
                     f"🔔 Alert triggered: {sym} {alert['condition']} "
                     f"{alert['target_price']} (current: {current_price})"
                 )
 
         if changed:
-            _save_json(ALERTS_FILE, alerts)
+            if _use_supabase:
+                for u in updates:
+                    _supabase.table("alerts").update({
+                        "triggered": True,
+                        "triggered_at": u["triggered_at"],
+                        "trigger_price": u["trigger_price"]
+                    }).eq("id", u["id"]).execute()
+            else:
+                all_alerts = _load_json(ALERTS_FILE)
+                update_map = {u["id"]: u for u in updates}
+                for i, a in enumerate(all_alerts):
+                    if a["id"] in update_map:
+                        all_alerts[i] = update_map[a["id"]]
+                _save_json(ALERTS_FILE, all_alerts)
 
     except Exception as e:
         logger.error(f"Error in check_alerts: {e}")
@@ -390,29 +414,33 @@ def root():
 @app.post("/auth/register")
 def register(body: UserRegister):
     """Register a new user account."""
-    users = _load_json(USERS_FILE)
-
-    # Check if email already exists
-    if any(u["email"].lower() == body.email.lower() for u in users):
-        raise HTTPException(status_code=409, detail="Email already registered")
-
-    user = {
+    user_data = {
         "id": str(uuid4()),
         "name": body.name.strip(),
         "email": body.email.lower().strip(),
         "password_hash": hash_password(body.password),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    users.append(user)
-    _save_json(USERS_FILE, users)
 
-    token = create_token(user["id"], user["email"])
+    if _use_supabase:
+        res = _supabase.table("users").select("id").eq("email", user_data["email"]).execute()
+        if res.data:
+            raise HTTPException(status_code=409, detail="Email already registered")
+        _supabase.table("users").insert(user_data).execute()
+    else:
+        users = _load_json(USERS_FILE)
+        if any(u["email"].lower() == user_data["email"] for u in users):
+            raise HTTPException(status_code=409, detail="Email already registered")
+        users.append(user_data)
+        _save_json(USERS_FILE, users)
+
+    token = create_token(user_data["id"], user_data["email"])
     return {
         "token": token,
         "user": {
-            "id": user["id"],
-            "name": user["name"],
-            "email": user["email"],
+            "id": user_data["id"],
+            "name": user_data["name"],
+            "email": user_data["email"],
         },
     }
 
@@ -420,8 +448,17 @@ def register(body: UserRegister):
 @app.post("/auth/login")
 def login(body: UserLogin):
     """Authenticate and return a JWT token."""
-    users = _load_json(USERS_FILE)
-    user = next((u for u in users if u["email"].lower() == body.email.lower().strip()), None)
+    email = body.email.lower().strip()
+    user = None
+    
+    if _use_supabase:
+        res = _supabase.table("users").select("*").eq("email", email).execute()
+        if res.data:
+            user = res.data[0]
+    else:
+        users = _load_json(USERS_FILE)
+        user = next((u for u in users if u["email"].lower() == email), None)
+        
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
@@ -451,17 +488,19 @@ def get_me(user: dict = Depends(get_current_user)):
 @app.get("/alerts")
 def get_alerts(user: dict = Depends(get_current_user)):
     """Fetch all alerts for the current user."""
-    alerts = _load_json(ALERTS_FILE)
-    user_alerts = [a for a in alerts if a.get("user_id") == user["id"]]
-    # Sort by created_at descending
-    user_alerts.sort(key=lambda a: a.get("created_at", ""), reverse=True)
-    return user_alerts
+    if _use_supabase:
+        res = _supabase.table("alerts").select("*").eq("user_id", user["id"]).order("created_at", desc=True).execute()
+        return res.data
+    else:
+        alerts = _load_json(ALERTS_FILE)
+        user_alerts = [a for a in alerts if a.get("user_id") == user["id"]]
+        user_alerts.sort(key=lambda a: a.get("created_at", ""), reverse=True)
+        return user_alerts
 
 
 @app.post("/alerts")
 def create_alert(alert: AlertCreate, user: dict = Depends(get_current_user)):
     """Create a new price alert."""
-    alerts = _load_json(ALERTS_FILE)
     new_alert = {
         "id": str(uuid4()),
         "user_id": user["id"],
@@ -473,20 +512,32 @@ def create_alert(alert: AlertCreate, user: dict = Depends(get_current_user)):
         "triggered_at": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    alerts.append(new_alert)
-    _save_json(ALERTS_FILE, alerts)
+    
+    if _use_supabase:
+        _supabase.table("alerts").insert(new_alert).execute()
+    else:
+        alerts = _load_json(ALERTS_FILE)
+        alerts.append(new_alert)
+        _save_json(ALERTS_FILE, alerts)
+        
     return new_alert
 
 
 @app.delete("/alerts/{alert_id}")
 def delete_alert(alert_id: str, user: dict = Depends(get_current_user)):
     """Delete an alert by ID."""
-    alerts = _load_json(ALERTS_FILE)
-    alert = next((a for a in alerts if a["id"] == alert_id and a.get("user_id") == user["id"]), None)
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    alerts = [a for a in alerts if a["id"] != alert_id]
-    _save_json(ALERTS_FILE, alerts)
+    if _use_supabase:
+        res = _supabase.table("alerts").select("id").eq("id", alert_id).eq("user_id", user["id"]).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        _supabase.table("alerts").delete().eq("id", alert_id).execute()
+    else:
+        alerts = _load_json(ALERTS_FILE)
+        alert = next((a for a in alerts if a["id"] == alert_id and a.get("user_id") == user["id"]), None)
+        if not alert:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        alerts = [a for a in alerts if a["id"] != alert_id]
+        _save_json(ALERTS_FILE, alerts)
     return {"deleted": True}
 
 
@@ -501,15 +552,23 @@ def get_vapid_key():
 @app.post("/subscribe")
 def subscribe_push(sub: PushSubscription, user: dict = Depends(get_current_user)):
     """Save a push subscription for notifications."""
-    subs = _load_json(PUSH_SUBS_FILE)
-    # Upsert: replace existing for this user
-    subs = [s for s in subs if s.get("user_id") != user["id"]]
-    subs.append({
-        "id": str(uuid4()),
-        "user_id": user["id"],
-        "subscription": sub.subscription,
-    })
-    _save_json(PUSH_SUBS_FILE, subs)
+    if _use_supabase:
+        _supabase.table("push_subscriptions").delete().eq("user_id", user["id"]).execute()
+        _supabase.table("push_subscriptions").insert({
+            "id": str(uuid4()),
+            "user_id": user["id"],
+            "subscription": sub.subscription
+        }).execute()
+    else:
+        subs = _load_json(PUSH_SUBS_FILE)
+        # Upsert: replace existing for this user
+        subs = [s for s in subs if s.get("user_id") != user["id"]]
+        subs.append({
+            "id": str(uuid4()),
+            "user_id": user["id"],
+            "subscription": sub.subscription,
+        })
+        _save_json(PUSH_SUBS_FILE, subs)
     return {"subscribed": True}
 
 
