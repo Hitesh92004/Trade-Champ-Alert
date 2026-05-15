@@ -17,7 +17,7 @@ export default function Navbar() {
     <nav className="navbar">
       <NavLink to={isAuthenticated ? "/dashboard" : "/"} className="navbar__brand">
         <span className="navbar__brand-icon">◆</span>
-        Trading Alerts
+        <span className="navbar__brand-text">Trading Alerts</span>
       </NavLink>
 
       <div className="navbar__right">

@@ -211,10 +211,10 @@ export default function HomePage() {
                 background: "transparent",
                 border: "none",
                 padding: 0,
-                fontSize: "0.85rem",
+                fontSize: window.innerWidth < 768 ? "1rem" : "0.85rem", // Larger font on mobile to prevent zoom
               }}
               type="text"
-              placeholder="Search symbol or company… (e.g. AAPL, Tesla, Bitcoin)"
+              placeholder={window.innerWidth < 768 ? "Search symbol..." : "Search symbol or company… (e.g. AAPL, Tesla)"}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
               onKeyDown={handleSearchKeyDown}
@@ -222,6 +222,25 @@ export default function HomePage() {
                 if (suggestions.length > 0) setShowSuggestions(true);
               }}
             />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput("");
+                  setSuggestions([]);
+                  setShowSuggestions(false);
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  padding: "0.2rem",
+                  fontSize: "0.8rem",
+                }}
+              >
+                ✕
+              </button>
+            )}
             {searchLoading && (
               <div
                 style={{

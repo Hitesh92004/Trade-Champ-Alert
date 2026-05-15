@@ -24,6 +24,16 @@ export default function InteractiveChart({ symbol, onAlertCreate }) {
   const [lastPrice, setLastPrice] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // Timeframe state
+  const [timeframe, setTimeframe] = useState("1Y");
+  const timeframes = {
+    "1D": { period: "1d", interval: "1m" },
+    "1W": { period: "5d", interval: "15m" },
+    "1M": { period: "1mo", interval: "1h" },
+    "6M": { period: "6mo", interval: "1d" },
+    "1Y": { period: "1y", interval: "1d" },
+  };
+
   // Drag state
   const [dragging, setDragging] = useState(false);
   const dragStartRef = useRef(null);
@@ -49,9 +59,12 @@ export default function InteractiveChart({ symbol, onAlertCreate }) {
       seriesRef.current = null;
     }
 
+    const isMobile = window.innerWidth < 768;
+    const chartHeight = isMobile ? 350 : 500;
+
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 500,
+      height: chartHeight,
       layout: {
         background: { color: "#0d0d0d" },
         textColor: "#666",
@@ -109,8 +122,9 @@ export default function InteractiveChart({ symbol, onAlertCreate }) {
       if (data) setHoverPrice(data.close);
     });
 
+    const { period, interval } = timeframes[timeframe];
     api
-      .get(`/history/${symbol}`)
+      .get(`/history/${symbol}?period=${period}&interval=${interval}`)
       .then((res) => {
         const ohlc = res.data;
         if (ohlc && ohlc.length > 0) {
@@ -130,7 +144,10 @@ export default function InteractiveChart({ symbol, onAlertCreate }) {
 
     const handleResize = () => {
       if (containerRef.current && chartRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
+        chart.applyOptions({ 
+          width: containerRef.current.clientWidth,
+          height: window.innerWidth < 768 ? 350 : 500
+        });
       }
     };
     window.addEventListener("resize", handleResize);
@@ -141,7 +158,7 @@ export default function InteractiveChart({ symbol, onAlertCreate }) {
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, [symbol]);
+  }, [symbol, timeframe]);
 
   // ── DOUBLE-CLICK to pin ──
   const handleChartDoubleClick = useCallback((e) => {
@@ -287,6 +304,31 @@ export default function InteractiveChart({ symbol, onAlertCreate }) {
               ${hoverPrice.toFixed(2)}
             </span>
           )}
+          
+          {/* Timeframe Selector */}
+          <div style={{ display: "flex", gap: "0.15rem", margin: "0 0.5rem" }}>
+            {Object.keys(timeframes).map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                style={{
+                  background: tf === timeframe ? "var(--accent)" : "transparent",
+                  color: tf === timeframe ? "var(--bg)" : "var(--text-muted)",
+                  border: "none",
+                  borderRadius: "3px",
+                  padding: "0.15rem 0.35rem",
+                  fontSize: "0.6rem",
+                  fontFamily: "var(--font-mono)",
+                  cursor: "pointer",
+                  fontWeight: tf === timeframe ? 700 : 400,
+                  transition: "all 0.2s ease"
+                }}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
+
           <span
             style={{
               fontFamily: "var(--font-mono)",

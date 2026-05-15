@@ -978,6 +978,10 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .navbar__brand-text {
+    display: none;
+  }
+
   .navbar__links {
     gap: 0;
   }
