@@ -395,9 +395,9 @@ export default function HomePage() {
           flexWrap: "wrap",
         }}
       >
-        <span>🖱️ Double-click → Set alert</span>
-        <span>↕ Drag line to adjust price</span>
-        <span>⎋ ESC → Dismiss</span>
+        <span>📊 Full TradingView chart</span>
+        <span>📐 Indicators &amp; drawings built-in</span>
+        <span>⚡ Set alerts via panel below chart</span>
       </div>
 
       {toast && <div className="toast">{toast}</div>}
